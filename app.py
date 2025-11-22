@@ -6,7 +6,7 @@ import re
 import os
 from difflib import get_close_matches
 
-# Try to use rapidfuzz if available (faster fuzzy matching), otherwise fallback to difflib
+# use rapidfuzz if available (faster fuzzy matching), otherwise fallback to difflib
 try:
     from rapidfuzz import fuzz, process
 except Exception:
@@ -42,11 +42,8 @@ else:
     FOOD_INDEX = FOOD_DF["food"].astype(str).str.lower().tolist()
     print(f"✅ Loaded {len(FOOD_DF)} items from {csv_path}")
 
-# ---------------- NOTE ABOUT SEMANTIC SEARCH ----------------
-# Semantic model removed for lightweight deployment (Render free tier 512MB).
-# The app uses fuzzy matching (rapidfuzz if available) and difflib get_close_matches as fallback.
 
-# ---------------- HELPERS ----------------
+
 def parse_quantity(q: str):
     if not q:
         return None, "unknown"
@@ -90,7 +87,7 @@ def parse_quantity(q: str):
 
 
 def scale_nutrients(row, grams: float):
-    # safe numeric conversion with defaults
+    # numeric conversion with defaults
     try:
         cal = float(row.get("calories_per_100g", 0) or 0)
         protein = float(row.get("protein_g", 0) or 0)
@@ -107,9 +104,7 @@ def scale_nutrients(row, grams: float):
     }
 
 
-# ---------------- Matching (lightweight) ----------------
 def semantic_food_match(q: str):
-    # Disabled in lightweight build
     return None
 
 
@@ -153,7 +148,6 @@ def fuzzy_food_match(q: str, threshold: int = 60):
 
 
 def find_food_match(item: str):
-    # Try semantic (disabled) then fuzzy
     s = semantic_food_match(item)
     if s:
         return s
@@ -201,7 +195,7 @@ def nutrition_breakdown(req: NutritionRequest):
                 "item": f"{f.item} ({label})",
                 "calories": 0, "protein": 0, "carbs": 0, "fat": 0,
                 "note": "Not found",
-                "suggestions": []  # suggestions could be added
+                "suggestions": []  
             })
             continue
 
