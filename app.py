@@ -334,6 +334,6 @@ def diet_plan(req: DietRequest):
 def health():
     return {"status": "healthy", "items_loaded": len(FOOD_DF)}
 
-if _name_ == "_main_":
+if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8080)
