@@ -50,8 +50,8 @@ FOOD_EMBEDDINGS = None
 
 if SentenceTransformer is not None and np is not None:
     try:
-        SEMANTIC_MODEL = SentenceTransformer("all-MiniLM-L6-v2")
-        FOOD_EMBEDDINGS = SEMANTIC_MODEL.encode(FOOD_INDEX)
+        #SEMANTIC_MODEL = SentenceTransformer("all-MiniLM-L6-v2")
+        #FOOD_EMBEDDINGS = SEMANTIC_MODEL.encode(FOOD_INDEX)
         print("Semantic model loaded")
     except:
         pass
@@ -108,22 +108,48 @@ def scale_nutrients(row, grams: float):
         "fat": round(row["fat_g"] * factor, 2),
     }
 
+SEMANTIC_MODEL = None
+FOOD_EMBEDDINGS = None
+
+def load_semantic_model():
+    global SEMANTIC_MODEL, FOOD_EMBEDDINGS, FOOD_INDEX
+
+    if SEMANTIC_MODEL is None:
+        try:
+            from sentence_transformers import SentenceTransformer
+            import numpy as np
+            import sklearn.metrics.pairwise as pairwise
+
+            print("Loading semantic model (lazy)...")
+            SEMANTIC_MODEL = SentenceTransformer("all-MiniLM-L6-v2")
+            FOOD_EMBEDDINGS = SEMANTIC_MODEL.encode(FOOD_INDEX)
+            print("Semantic model loaded successfully (lazy).")
+
+        except Exception as e:
+            print("Semantic model failed to load:", e)
+            SEMANTIC_MODEL = None
+            FOOD_EMBEDDINGS = None
 
 def semantic_food_match(q):
-    if SEMANTIC_MODEL is None:  
+    # Lazy load the model only when needed
+    load_semantic_model()
+
+    if SEMANTIC_MODEL is None or FOOD_EMBEDDINGS is None:
         return None
+
     try:
         q_emb = SEMANTIC_MODEL.encode([q.lower()])
         sims = pairwise.cosine_similarity(q_emb, FOOD_EMBEDDINGS)[0]
         idx = int(sims.argmax())
 
         if sims[idx] >= 0.55:
-            item = FOOD_DF.iloc[idx].to_dict()
-            return item
-    except:
-        return None
-    return None
+            return FOOD_DF.iloc[idx].to_dict()
 
+    except Exception as e:
+        print("Semantic match error:", e)
+        return None
+
+    return None
 
 def fuzzy_food_match(q):
     q = q.lower()
