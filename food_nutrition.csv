@@ -1,0 +1,43 @@
+food,region,category,calories_per_100g,protein_g,carbs_g,fat_g
+Chapathi,India,Grain/Flatbread,250,8,45,3.5
+Rice (brown),International,Grain,111,2.6,23,0.9
+Idli,India,Snack/Breakfast,94,3.6,20,0.6
+Dosa,India,Snack/Breakfast,168,3.8,26,5
+Sambar,India,Gravy,80,3,12,1.5
+Potato Kurma,India,Curry,130,2,18,5
+Paneer (cottage cheese),India,Dairy,265,18.3,1.2,20.8
+Grilled Chicken,International,Meat,165,31,0,3.6
+Fish (rohu),India,Seafood,128,20.5,0,4.8
+Tofu,International,Protein,76,8,1.9,4.8
+Oats,International,Grain,389,16.9,66.3,6.9
+Banana,International,Fruit,89,1.1,22.8,0.3
+Apple,International,Fruit,52,0.3,14,0.2
+Almonds,International,Nuts,579,21.2,21.6,49.9
+Peanuts,International,Nuts,567,25.8,16.1,49.2
+Milk (whole),International,Dairy,60,3.2,4.8,3.3
+Ghee,India,Fat,900,0,0,100
+Curd (yogurt),India,Dairy,61,3.5,4.7,3.3
+Mixed Vegetables,International,Vegetable,65,2.5,12,0.3
+Spinach,International,Vegetable,23,2.9,3.6,0.4
+Egg (whole),International,Protein,155,13,1.1,11
+Quinoa,International,Grain,120,4.4,21.3,1.9
+Peas,International,Vegetable,81,5.4,14.5,0.4
+Chickpea (boiled),International,Legume,164,8.9,27.4,2.6
+Greek Yogurt,International,Dairy,59,10,3.6,0.4
+Avocado,International,Fruit,160,2,9,15
+Olive Oil,International,Fat,884,0,0,100
+Sweet Potato,International,Vegetable,86,1.6,20.1,0.1
+Roti (whole wheat),India,Grain/Flatbread,237,8.9,41.2,3.4
+Butter,International,Dairy,717,0.9,0.1,81.1
+Lentils (cooked),India,Legume,116,9,20,0.4
+Sausage (grilled),International,Meat,301,12,1.3,26
+Pasta (cooked),International,Grain,131,5,25,1.1
+Pizza slice (veg),International,Prepared,266,11,33,10
+Schezwan Chicken,India,Prepared,210,18,6,12
+Masala Dosa (with potato),India,Prepared,168,3.8,26,5
+Butter Chicken,India,Prepared,239,17,6,15
+Mutton Curry,India,Prepared,294,25,0,20
+Hummus,International,Spread,166,7.9,14.3,9.6
+Cucumber,International,Vegetable,16,0.7,3.6,0.1
+Tomato,International,Vegetable,18,0.9,3.9,0.2
+Curd (yogurt),India,Dairy,61,3.5,4.7,3.3
