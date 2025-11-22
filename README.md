@@ -63,16 +63,21 @@ https://ai-diet-app.onrender.com/docs
 *POST* /nutrition-breakdown
 
 #### Sample Input:
-```json
+
+---
+
+### 2️⃣ *Nutrition Breakdown*
+*POST* /nutrition-breakdown
+
+#### Sample Input:
+
 {
   "foods": [
-    {"item": "chapathi", "quantity": "2 pieces"},
+  {"item": "chapathi", "quantity": "2 pieces"},
     {"item": "banana", "quantity": "1 piece"},
     {"item": "rice", "quantity": "1 cup"}
   ]
 }
-
-
 ---
 
 3️⃣ Diet Plan Generation
@@ -103,13 +108,16 @@ Visit:
 ➡ https://ai-diet-app.onrender.com/docs
 You will see forms to test each endpoint.
 
----
 
+
+---
 
 ☁ Deployment (Render)
 
 Uses Docker Deployment
 Deployed at: https://ai-diet-app.onrender.com
+
+
 
 ---
 
