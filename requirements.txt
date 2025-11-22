@@ -1,8 +1,5 @@
 fastapi
 uvicorn[standard]
 pandas
-numpy
 python-multipart
-sentence-transformers
-scikit-learn
 rapidfuzz

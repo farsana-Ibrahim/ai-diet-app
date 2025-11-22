@@ -6,23 +6,14 @@ import re
 import os
 from difflib import get_close_matches
 
-
-try:
-    from sentence_transformers import SentenceTransformer
-    import sklearn.metrics.pairwise as pairwise
-    import numpy as np
-except:
-    SentenceTransformer = None
-    pairwise = None
-    np = None
-
+# Try to use rapidfuzz if available (faster fuzzy matching), otherwise fallback to difflib
 try:
     from rapidfuzz import fuzz, process
-except:
+except Exception:
     fuzz = None
     process = None
 
-app = FastAPI(title="AI Diet Plan & Nutrition API (Final Merged Version)")
+app = FastAPI(title="AI Diet Plan & Nutrition API (Lightweight)")
 
 # ---------------- LOAD DATA ----------------
 CSV_PATHS = ["food_nutrition.csv", "/mnt/data/food_nutrition.csv"]
@@ -33,35 +24,34 @@ for p in CSV_PATHS:
             FOOD_DF = pd.read_csv(p)
             csv_path = p
             break
-        except:
+        except Exception as e:
+            print("Failed to read CSV:", e)
             FOOD_DF = None
 
 if FOOD_DF is None:
     FOOD_DF = pd.DataFrame(columns=["food", "region", "category",
                                     "calories_per_100g", "protein_g", "carbs_g", "fat_g"])
+    FOOD_INDEX = []
+    print("⚠ food_nutrition.csv not found. Using empty dataframe.")
 else:
     FOOD_DF.columns = [c.strip() for c in FOOD_DF.columns]
-    FOOD_INDEX = FOOD_DF["food"].str.lower().tolist()
-    print(f"Loaded {len(FOOD_DF)} items from {csv_path}")
+    # Ensure column types exist
+    for col in ["food", "region", "category", "calories_per_100g", "protein_g", "carbs_g", "fat_g"]:
+        if col not in FOOD_DF.columns:
+            FOOD_DF[col] = ""
+    FOOD_INDEX = FOOD_DF["food"].astype(str).str.lower().tolist()
+    print(f"✅ Loaded {len(FOOD_DF)} items from {csv_path}")
 
-# ---------------- SEMANTIC MODEL ----------------
-SEMANTIC_MODEL = None
-FOOD_EMBEDDINGS = None
-
-if SentenceTransformer is not None and np is not None:
-    try:
-        #SEMANTIC_MODEL = SentenceTransformer("all-MiniLM-L6-v2")
-        #FOOD_EMBEDDINGS = SEMANTIC_MODEL.encode(FOOD_INDEX)
-        print("Semantic model loaded")
-    except:
-        pass
+# ---------------- NOTE ABOUT SEMANTIC SEARCH ----------------
+# Semantic model removed for lightweight deployment (Render free tier 512MB).
+# The app uses fuzzy matching (rapidfuzz if available) and difflib get_close_matches as fallback.
 
 # ---------------- HELPERS ----------------
 def parse_quantity(q: str):
     if not q:
         return None, "unknown"
 
-    q = q.lower().strip()
+    q = str(q).lower().strip()
     conversions = {
         "g": 1, "gm": 1, "gram": 1, "grams": 1,
         "kg": 1000,
@@ -100,85 +90,70 @@ def parse_quantity(q: str):
 
 
 def scale_nutrients(row, grams: float):
-    factor = grams / 100
+    # safe numeric conversion with defaults
+    try:
+        cal = float(row.get("calories_per_100g", 0) or 0)
+        protein = float(row.get("protein_g", 0) or 0)
+        carbs = float(row.get("carbs_g", 0) or 0)
+        fat = float(row.get("fat_g", 0) or 0)
+    except Exception:
+        cal = protein = carbs = fat = 0.0
+    factor = grams / 100 if grams is not None else 0
     return {
-        "calories": round(row["calories_per_100g"] * factor, 2),
-        "protein": round(row["protein_g"] * factor, 2),
-        "carbs": round(row["carbs_g"] * factor, 2),
-        "fat": round(row["fat_g"] * factor, 2),
+        "calories": round(cal * factor, 2),
+        "protein": round(protein * factor, 2),
+        "carbs": round(carbs * factor, 2),
+        "fat": round(fat * factor, 2),
     }
 
-SEMANTIC_MODEL = None
-FOOD_EMBEDDINGS = None
 
-def load_semantic_model():
-    global SEMANTIC_MODEL, FOOD_EMBEDDINGS, FOOD_INDEX
-
-    if SEMANTIC_MODEL is None:
-        try:
-            from sentence_transformers import SentenceTransformer
-            import numpy as np
-            import sklearn.metrics.pairwise as pairwise
-
-            print("Loading semantic model (lazy)...")
-            SEMANTIC_MODEL = SentenceTransformer("all-MiniLM-L6-v2")
-            FOOD_EMBEDDINGS = SEMANTIC_MODEL.encode(FOOD_INDEX)
-            print("Semantic model loaded successfully (lazy).")
-
-        except Exception as e:
-            print("Semantic model failed to load:", e)
-            SEMANTIC_MODEL = None
-            FOOD_EMBEDDINGS = None
-
-def semantic_food_match(q):
-    # Lazy load the model only when needed
-    load_semantic_model()
-
-    if SEMANTIC_MODEL is None or FOOD_EMBEDDINGS is None:
-        return None
-
-    try:
-        q_emb = SEMANTIC_MODEL.encode([q.lower()])
-        sims = pairwise.cosine_similarity(q_emb, FOOD_EMBEDDINGS)[0]
-        idx = int(sims.argmax())
-
-        if sims[idx] >= 0.55:
-            return FOOD_DF.iloc[idx].to_dict()
-
-    except Exception as e:
-        print("Semantic match error:", e)
-        return None
-
+# ---------------- Matching (lightweight) ----------------
+def semantic_food_match(q: str):
+    # Disabled in lightweight build
     return None
 
-def fuzzy_food_match(q):
-    q = q.lower()
 
-    if q in FOOD_INDEX:
-        return FOOD_DF[FOOD_DF["food"].str.lower() == q].iloc[0].to_dict()
+def fuzzy_food_match(q: str, threshold: int = 60):
+    """
+    Lightweight fuzzy: try exact -> contains -> rapidfuzz -> difflib
+    """
+    if FOOD_DF.empty:
+        return None
 
-    # Contains logic
-    df = FOOD_DF[FOOD_DF["food"].str.lower().str.contains(q)]
-    if not df.empty:
-        return df.iloc[0].to_dict()
+    q = str(q).strip().lower()
+    # exact match
+    exact = FOOD_DF[FOOD_DF["food"].astype(str).str.lower() == q]
+    if not exact.empty:
+        return exact.iloc[0].to_dict()
 
-    # RapidFuzz
-    if process is not None:
+    # contains
+    contains = FOOD_DF[FOOD_DF["food"].astype(str).str.lower().str.contains(q, na=False)]
+    if not contains.empty:
+        return contains.iloc[0].to_dict()
+
+    # rapidfuzz (if installed)
+    if process is not None and fuzz is not None and FOOD_INDEX:
         try:
-            best, score, _ = process.extractOne(q, FOOD_INDEX, scorer=fuzz.token_sort_ratio)
-            if score >= 60:
-                return FOOD_DF[FOOD_DF["food"].str.lower() == best].iloc[0].to_dict()
-        except:
+            best = process.extractOne(q, FOOD_INDEX, scorer=fuzz.token_sort_ratio)
+            if best:
+                best_match, score, _ = best
+                if score >= threshold:
+                    matched = FOOD_DF[FOOD_DF["food"].astype(str).str.lower() == best_match].iloc[0].to_dict()
+                    matched["confidence"] = score
+                    return matched
+        except Exception:
             pass
 
+    # difflib fallback
     matches = get_close_matches(q, FOOD_INDEX, n=1, cutoff=0.5)
     if matches:
-        return FOOD_DF[FOOD_DF["food"].str.lower() == matches[0]].iloc[0].to_dict()
+        return FOOD_DF[FOOD_DF["food"].astype(str).str.lower() == matches[0]].iloc[0].to_dict()
 
     return None
 
 
-def find_food_match(item):
+def find_food_match(item: str):
+    # Try semantic (disabled) then fuzzy
     s = semantic_food_match(item)
     if s:
         return s
@@ -209,29 +184,30 @@ class DietRequest(BaseModel):
 # ---------------- NUTRITION BREAKDOWN ----------------
 @app.post("/nutrition-breakdown")
 def nutrition_breakdown(req: NutritionRequest):
+    if FOOD_DF.empty:
+        raise HTTPException(status_code=500, detail="Nutrition dataset not loaded")
+
     output = []
-    total_cals = 0
-    total_pro = 0
-    total_car = 0
-    total_fat = 0
+    total_cals = total_pro = total_car = total_fat = 0.0
 
     for f in req.foods:
         grams, label = parse_quantity(f.quantity)
         if grams is None:
-            raise HTTPException(400, f"Invalid quantity: {f.quantity}")
+            raise HTTPException(status_code=400, detail=f"Invalid quantity: {f.quantity}")
 
         match = find_food_match(f.item)
         if match is None:
             output.append({
                 "item": f"{f.item} ({label})",
                 "calories": 0, "protein": 0, "carbs": 0, "fat": 0,
-                "note": "Not found"
+                "note": "Not found",
+                "suggestions": []  # suggestions could be added
             })
             continue
 
         scaled = scale_nutrients(match, grams)
         output.append({
-            "item": match["food"],
+            "item": match.get("food", f.item),
             "calories": scaled["calories"],
             "protein": scaled["protein"],
             "carbs": scaled["carbs"],
@@ -245,11 +221,11 @@ def nutrition_breakdown(req: NutritionRequest):
 
     return {
         "meal_nutrition": {
-            "total_calories": round(total_cals,2),
+            "total_calories": round(total_cals, 2),
             "macros": {
-                "protein": round(total_pro,2),
-                "carbs": round(total_car,2),
-                "fat": round(total_fat,2),
+                "protein": round(total_pro, 2),
+                "carbs": round(total_car, 2),
+                "fat": round(total_fat, 2)
             },
             "breakdown": output
         }
@@ -259,6 +235,8 @@ def nutrition_breakdown(req: NutritionRequest):
 # ---------------- 7-DAY BALANCED DIET PLAN ----------------
 @app.post("/diet-plan")
 def diet_plan(req: DietRequest):
+    if FOOD_DF.empty:
+        raise HTTPException(status_code=500, detail="Nutrition dataset not loaded")
 
     weight = req.current_weight
     height = req.height
@@ -279,38 +257,39 @@ def diet_plan(req: DietRequest):
     target = max(1200, target)
 
     # ------------ REGION-BASED FILTERING ------------
-    region = req.region.lower()
+    region = (req.region or "").lower()
 
-    # Start from all foods
     regional_df = FOOD_DF.copy()
-
-    # If user selects India → use only Indian foods
     if "india" in region:
-        regional_df = regional_df[regional_df["region"].str.contains("India", case=False, na=False)]
+        try:
+            regional_df = regional_df[regional_df["region"].astype(str).str.contains("India", case=False, na=False)]
+        except Exception:
+            regional_df = FOOD_DF.copy()
 
-    # If filtering removes all items → fallback
     if regional_df.empty:
         regional_df = FOOD_DF.copy()
 
     # ------------ CUISINE FILTER (VEGETARIAN / NON-VEG ) ------------
-    cuisine = req.cuisine_preference.lower()
-
+    cuisine = (req.cuisine_preference or "").lower()
     veg_blocklist = ["chicken", "fish", "mutton", "egg", "pork", "beef", "sausage", "seafood"]
 
     if "vegetarian" in cuisine:
         for item in veg_blocklist:
-            regional_df = regional_df[~regional_df["food"].str.lower().str.contains(item, na=False)]
+            regional_df = regional_df[~regional_df["food"].astype(str).str.lower().str.contains(item, na=False)]
 
-    # Fallback if vegetarian-only filter removed all foods
     if regional_df.empty:
         regional_df = FOOD_DF.copy()
 
     # ------------ PICK FUNCTION (uses regional_df) ------------
     def pick(cat, n=2):
-        df = regional_df[regional_df["category"].str.contains(cat, case=False, na=False)]
+        df = regional_df[regional_df["category"].astype(str).str.contains(cat, case=False, na=False)]
         if df.empty:
             df = regional_df
-        return df.sample(min(len(df), n)).to_dict(orient="records")
+        # If df.sample fails when len(df) == 0, fallback
+        count = min(len(df), n) if len(df) > 0 else 0
+        if count == 0:
+            return []
+        return df.sample(count).to_dict(orient="records")
 
     # ------------ BUILD WEEKLY DIET PLAN ------------
     week = {}
@@ -322,11 +301,11 @@ def diet_plan(req: DietRequest):
 
         def assemble(items, cal_target):
             out = []
-            total = 0
+            total = 0.0
             for it in items:
                 scaled = scale_nutrients(it, 120)
                 total += scaled["calories"]
-                out.append({"food": it["food"], "calories": scaled["calories"]})
+                out.append({"food": it.get("food", ""), "serving_g": 120, "calories": scaled["calories"]})
             if total > 0:
                 factor = cal_target / total
                 for o in out:
@@ -355,6 +334,6 @@ def diet_plan(req: DietRequest):
 def health():
     return {"status": "healthy", "items_loaded": len(FOOD_DF)}
 
-if __name__ == "__main__":
+if _name_ == "_main_":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8080)
